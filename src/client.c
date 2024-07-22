@@ -18,8 +18,6 @@
 
 #include "minivtun.h"
 
-static bool rewind_dynamic_link_metric = false;
-
 static void handle_link_up(void)
 {
 	struct vt_route *rt;
@@ -305,11 +303,6 @@ static bool do_link_health_assess(void)
 	return health_ok;
 }
 
-static void usr1_signal_handler(int signum)
-{
-	rewind_dynamic_link_metric = true;
-}
-
 int run_client(const char *peer_addr_pair)
 {
 	char s_peer_addr[50];
@@ -366,8 +359,6 @@ int run_client(const char *peer_addr_pair)
 		}
 	}
 
-	signal(SIGUSR1, usr1_signal_handler);
-
 	for (;;) {
 		fd_set rset;
 		struct timeval __current, timeo;
@@ -383,12 +374,8 @@ int run_client(const char *peer_addr_pair)
 		rc = select((state.tunfd > state.sockfd ? state.tunfd : state.sockfd) + 1,
 				&rset, NULL, NULL, &timeo);
 		if (rc < 0) {
-			if (errno == EINTR || errno == ERESTART) {
-				/* Fall through */
-			} else {
-				fprintf(stderr, "*** select(): %s.\n", strerror(errno));
-				return -1;
-			}
+			fprintf(stderr, "*** select(): %s.\n", strerror(errno));
+			return -1;
 		}
 
 		gettimeofday(&__current, NULL);
@@ -433,19 +420,6 @@ int run_client(const char *peer_addr_pair)
 					state.health_based_link_up = true;
 				}
 			}
-		}
-
-		/* Rewind to initial route metric and trigger a reconnect */
-		if (rewind_dynamic_link_metric) {
-			rewind_dynamic_link_metric = false;
-			if (state.is_link_ok) {
-				if (config.dynamic_link)
-					handle_link_down();
-				state.is_link_ok = false;
-			}
-			state.rt_metric = config.vt_metric;
-			syslog(LOG_INFO, "Reset dynamic link route metric.");
-			need_reconnect = true;
 		}
 
 		if (need_reconnect) {
