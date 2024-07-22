@@ -13,7 +13,7 @@ CFLAGS += -Wall
 HEADERS = minivtun.h library.h list.h jhash.h
 
 minivtun: minivtun.o library.o server.o client.o
-	$(CC) $(LDFLAGS) -o $@ $^ -lcrypto
+	$(CC) $(LDFLAGS) -o $@ $^ -lmbedtls 
 
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c -o $@ $<
